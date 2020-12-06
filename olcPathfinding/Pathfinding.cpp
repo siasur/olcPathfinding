@@ -39,6 +39,8 @@ private:
 public:
 	bool OnUserCreate() override
 	{
+		srand(std::time(0));
+
 		nCellSize = 24;
 		nBorderSize = 2;
 		nAreaHeight = ScreenHeight() / nCellSize;
@@ -46,6 +48,7 @@ public:
 		cBoard = new cell[nAreaWidth * nAreaHeight];
 		nHeightMap = new int[nAreaWidth * nAreaHeight];
 		nMaxSteps = 15;
+		bCalculate = true;
 
 		for (int x = 0; x < nAreaWidth; x++)
 			for (int y = 0; y < nAreaHeight; y++)
@@ -101,6 +104,27 @@ public:
 			nEndY = y;
 			bCalculate = true;
 		};
+		auto setCost = [&](int x, int y, int cost) {
+			if (cBoard[xy(x, y)].isObstacle)
+				return;
+
+			cBoard[xy(x, y)].costFactor = cost;
+
+			bCalculate = true;
+		};
+		auto getColor = [&](int cost) {
+			switch (cost)
+			{
+			case 1:
+				return olc::BLUE;
+			case 2:
+				return olc::DARK_BLUE;
+			case 3:
+				return olc::VERY_DARK_BLUE;
+			default:
+				return olc::BLUE;
+			}
+		};
 
 		// Prepare
 		int nMouseCellX = GetMouseX() / nCellSize;
@@ -129,6 +153,23 @@ public:
 			bCalculate = true;
 		}
 
+		if (GetKey(olc::Key::NP1).bReleased)
+			setCost(nMouseCellX, nMouseCellY, 1);
+
+		if (GetKey(olc::Key::NP2).bReleased)
+			setCost(nMouseCellX, nMouseCellY, 2);
+
+		if (GetKey(olc::Key::NP3).bReleased)
+			setCost(nMouseCellX, nMouseCellY, 3);
+
+		if (GetKey(olc::Key::NP0).bReleased) {
+			for (int x = 0; x < nAreaWidth; x++)
+				for (int y = 0; y < nAreaHeight; y++)
+					cBoard[xy(x, y)].costFactor = 1;
+			bCalculate = true;
+		}
+
+
 		if (GetKey(olc::Key::NP_ADD).bReleased)
 			nMaxSteps = std::min(120, nMaxSteps + 1);
 
@@ -142,7 +183,7 @@ public:
 			{
 				cell cur = cBoard[xy(x, y)];
 
-				olc::Pixel pixel = cur.isObstacle ? olc::GREY : olc::BLUE;
+				olc::Pixel pixel = cur.isObstacle ? olc::GREY : getColor(cur.costFactor);
 				FillRect({ x * nCellSize + (nBorderSize / 2),  y * nCellSize + (nBorderSize / 2) }, { nCellSize - nBorderSize, nCellSize - nBorderSize }, pixel);
 
 				if (cur.isStart) {
@@ -155,7 +196,7 @@ public:
 				if (x == nMouseCellX && y == nMouseCellY)
 					DrawRect({ x * nCellSize, y * nCellSize }, { nCellSize - (nBorderSize / 2), nCellSize - (nBorderSize / 2) }, olc::YELLOW);
 
-				//DrawString(x * nCellSize, y * nCellSize, std::to_string(nHeightMap[xy(x, y)]));
+				DrawString(x * nCellSize, y * nCellSize, std::to_string(nHeightMap[xy(x, y)]));
 			}
 
 		cell *last = nullptr;
@@ -204,16 +245,16 @@ public:
 				nHeightMap[xy(x, y)] = d;
 
 				if ((x + 1) < nAreaWidth && nHeightMap[xy(x + 1, y)] == 0)
-					found_nodes.push_back({ x + 1, y, d + 1 });
+					found_nodes.push_back({ x + 1, y, d + cBoard[xy(x + 1,y)].costFactor });
 
 				if ((x - 1) >= 0 && nHeightMap[xy(x - 1, y)] == 0)
-					found_nodes.push_back({ x - 1, y, d + 1 });
+					found_nodes.push_back({ x - 1, y, d + cBoard[xy(x - 1,y)].costFactor });
 
 				if ((y + 1) < nAreaWidth && nHeightMap[xy(x, y + 1)] == 0)
-					found_nodes.push_back({ x, y + 1, d + 1 });
+					found_nodes.push_back({ x, y + 1, d + cBoard[xy(x, y + 1)].costFactor });
 
 				if ((y - 1) >= 0 && nHeightMap[xy(x, y - 1)] == 0)
-					found_nodes.push_back({ x, y - 1, d + 1 });
+					found_nodes.push_back({ x, y - 1, d + cBoard[xy(x, y - 1)].costFactor });
 			}
 
 			found_nodes.sort([&](const std::tuple<int, int, int>& v1, const std::tuple<int, int, int>& v2)
